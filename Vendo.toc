@@ -6,3 +6,4 @@
 ## SavedVariables: VendoDB
 
 Vendo.lua
+Vendo_Options.lua
