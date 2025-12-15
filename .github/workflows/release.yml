@@ -1,0 +1,32 @@
+name: Build & Release ZIP
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare addon folder
+        run: |
+          mkdir -p dist/Vendo
+          cp -r README.md LICENSE .gitignore Vendo.toc Vendo.lua Vendo_Options.lua dist/Vendo/ || true
+
+      - name: Create ZIP
+        run: |
+          cd dist
+          zip -r "../Vendo-${GITHUB_REF_NAME}.zip" "Vendo"
+
+      - name: Publish Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: Vendo-${{ github.ref_name }}.zip
