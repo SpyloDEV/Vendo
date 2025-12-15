@@ -1,1 +1,8 @@
+## Interface: 110000
+## Title: Vendo
+## Notes: Lightweight vendor automation for repairs and gray item selling.
+## Author: Tristan
+## Version: 0.1.0
+## SavedVariables: VendoDB
 
+Vendo.lua
