@@ -1,4 +1,5 @@
-local Vendo = Vendo or {}
+Vendo = Vendo or {}
+local Vendo = Vendo
 
 local function GetToday()
     return date("%Y-%m-%d")
