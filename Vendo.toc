@@ -1,8 +1,8 @@
 ## Interface: 120000
 ## Title: Vendo
-## Notes: Erweitertes Vendor-Automatisierungs-Addon mit per-Char Settings, Sounds, detaillierten Stats und modularen Features.
-## Author: Tristan (erweitert mit Grok)
-## Version: 0.3.0
+## Notes: Lightweight vendor automation with auto repair, smart selling, and gold statistics.
+## Author: Spylo
+## Version: 0.2.1
 ## SavedVariablesPerCharacter: VendoDBPC
 
 Vendo_Stats.lua
