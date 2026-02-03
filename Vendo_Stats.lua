@@ -42,3 +42,30 @@ function Vendo:PrintStats()
     print("• Repairs:", GetCoinTextureString(-t.repaired))
     print("• Net:", GetCoinTextureString(t.sold - t.repaired))
 end
+local function ShouldShowTooltipStats()
+    if not IsShiftKeyDown() then return false end
+    if not MerchantFrame or not MerchantFrame:IsShown() then return false end
+
+    local t = VendoDB.stats and VendoDB.stats.today
+    if not t then return false end
+
+    return (t.sold > 0 or t.repaired > 0)
+end
+
+local function AddTooltipStats(tooltip)
+    local t = VendoDB.stats.today
+    if not t then return end
+
+    tooltip:AddLine(" ")
+    tooltip:AddLine("|cffffd200Vendo Stats (Today)|r")
+    tooltip:AddLine("Sold: " .. GetCoinTextureString(t.sold), 0, 1, 0)
+    tooltip:AddLine("Repairs: " .. GetCoinTextureString(-t.repaired), 1, 0.4, 0.4)
+    tooltip:AddLine("Net: " .. GetCoinTextureString(t.sold - t.repaired), 0.4, 1, 0.4)
+end
+
+GameTooltip:HookScript("OnTooltipSetUnit", function(tooltip)
+    if ShouldShowTooltipStats() then
+        AddTooltipStats(tooltip)
+        tooltip:Show()
+    end
+end)
