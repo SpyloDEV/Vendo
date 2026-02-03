@@ -1,32 +1,76 @@
-name: Build & Release ZIP
+name: Build & Release ZIP + CurseForge Upload
 
 on:
   push:
     tags:
-      - "v*.*.*"
+      - "v*.*.*"          # z. B. v0.2.1, v1.0.0
+      - "v*.*.*-beta*"    # Optional: Betas erlauben
 
 permissions:
-  contents: write
+  contents: write       # Für Releases + Tags
+  packages: write       # Falls du später Packages brauchst
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # Voll History für Changelog-Generierung
+
+      - name: Set up variables
+        id: vars
+        run: |
+          echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "zip_name=Vendo-${GITHUB_REF#refs/tags/v}.zip" >> $GITHUB_OUTPUT
+          echo "addon_folder=Vendo" >> $GITHUB_OUTPUT
 
       - name: Prepare addon folder
         run: |
-          mkdir -p dist/Vendo
-          cp -r README.md LICENSE .gitignore Vendo.toc Vendo.lua Vendo_Options.lua dist/Vendo/ || true
+          mkdir -p dist/${{ steps.vars.outputs.addon_folder }}
+          cp -r ./* dist/${{ steps.vars.outputs.addon_folder }}/
+          # Entferne unnötige Dateien (gitignore-respektierend)
+          rm -rf dist/${{ steps.vars.outputs.addon_folder }}/{.git,.github,dist}
 
       - name: Create ZIP
+        working-directory: dist
         run: |
-          cd dist
-          zip -r "../Vendo-${GITHUB_REF_NAME}.zip" "Vendo"
+          zip -r "${{ steps.vars.outputs.zip_name }}" ${{ steps.vars.outputs.addon_folder }}/
 
-      - name: Publish Release Asset
-        uses: softprops/action-gh-release@v2
+      - name: Generate Release Notes (optional – simple)
+        id: changelog
+        uses: natescherer/changelog-from-commits@v1  # Oder softprops mit generate_release_notes
         with:
-          files: Vendo-${{ github.ref_name }}.zip
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2  # Aktuellste Version!
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Vendo ${{ steps.vars.outputs.version }}
+          body: |
+            ${{ steps.changelog.outputs.changelog || 'See commits for changes' }}
+            
+            **Changes since last release:**
+            - Auto-generated from commits
+            
+            Download ZIP below or update via CurseForge.
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          generate_release_notes: true          # GitHub auto-Changelog
+          files: dist/${{ steps.vars.outputs.zip_name }}
+
+      - name: Upload to CurseForge (optional – super nützlich!)
+        if: success() && !contains(github.ref_name, 'beta')  # Nur stabile Releases
+        uses: itsmeow/curseforge-upload@v3  # Oder neueres Fork, falls veraltet
+        with:
+          file: dist/${{ steps.vars.outputs.zip_name }}
+          game: wow
+          project_id: YOUR_CURSE_PROJECT_ID_HERE   # z. B. 123456 aus CurseForge-URL
+          token: ${{ secrets.CURSEFORGE_API_TOKEN }}  # Secrets → Repository Settings → Secrets and variables → Actions
+          display_name: Vendo ${{ steps.vars.outputs.version }}
+          release_type: release
+          changelog: "See GitHub release notes for full details."
+          game_versions: "Retail"  # Oder "The War Within" etc. – anpassbar
