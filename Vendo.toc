@@ -1,9 +1,9 @@
 ## Interface: 120000
 ## Title: Vendo
-## Notes: Lightweight vendor automation with stats and smart tooltip
-## Author: Tristan
-## Version: 0.2.0
-## SavedVariables: VendoDB
+## Notes: Erweitertes Vendor-Automatisierungs-Addon mit per-Char Settings, Sounds, detaillierten Stats und modularen Features.
+## Author: Tristan (erweitert mit Grok)
+## Version: 0.3.0
+## SavedVariablesPerCharacter: VendoDBPC
 
 Vendo_Stats.lua
 Vendo.lua
