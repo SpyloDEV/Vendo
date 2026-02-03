@@ -7,3 +7,4 @@
 
 Vendo.lua
 Vendo_Options.lua
+Vendo_Stats.lua
