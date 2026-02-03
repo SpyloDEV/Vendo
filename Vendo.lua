@@ -1,193 +1,118 @@
 local ADDON_NAME = ...
 local frame = CreateFrame("Frame")
-local Vendo = {}  -- Namespace für Modularität
 
--- Utility: money formatting
+-- Globals
+VendoDBPC = VendoDBPC or {}
+local Vendo = { DB = {} }
+
+-- Utils
 local function FormatMoney(copper)
   if not copper or copper <= 0 then return "0c" end
-  local gold = math.floor(copper / 10000)
-  local silver = math.floor((copper % 10000) / 100)
-  local copperRest = copper % 100
-
-  local parts = {}
-  if gold > 0 then table.insert(parts, gold .. "g") end
-  if silver > 0 then table.insert(parts, silver .. "s") end
-  if copperRest > 0 or #parts == 0 then
-    table.insert(parts, copperRest .. "c")
-  end
-  return table.concat(parts, " ")
+  local g = math.floor(copper / 10000)
+  local s = math.floor((copper % 10000) / 100)
+  local c = copper % 100
+  return (g > 0 and g.."g " or "") .. (s > 0 and s.."s " or "") .. c.."c":gsub("%s+$", "")
 end
 
--- Chat output
 local function Print(msg)
-  if VendoDB.chat then
+  if Vendo.DB.chat then
     DEFAULT_CHAT_FRAME:AddMessage("|cff6cf5c2Vendo|r: " .. msg)
   end
 end
 
--- Per-Char Migration und Init
+-- Init & Migration
 frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", function(self, event, addon)
   if addon ~= ADDON_NAME then return end
 
   local charKey = UnitName("player") .. "-" .. GetRealmName()
-  VendoDBPC = VendoDBPC or {}
   VendoDBPC[charKey] = VendoDBPC[charKey] or {}
 
-  -- Migrate alte globale DB, falls vorhanden
+  -- Migrate old global DB if exists
   if VendoDB then
     for k, v in pairs(VendoDB) do
-      VendoDBPC[charKey][k] = v
+      if type(v) == "table" then
+        VendoDBPC[charKey][k] = VendoDBPC[charKey][k] or {}
+        for kk, vv in pairs(v) do VendoDBPC[charKey][k][kk] = vv end
+      else
+        VendoDBPC[charKey][k] = v
+      end
     end
-    VendoDB = nil  -- Alte löschen
+    VendoDB = nil  -- Clear old
+    Print("Migrated settings to per-char.")
   end
 
-  Vendo.DB = VendoDBPC[charKey]  -- Aktuelle DB referenzieren
+  Vendo.DB = VendoDBPC[charKey]
 
-  -- Defaults
-  Vendo.DB.enabled = Vendo.DB.enabled ~= false  -- true default
+  -- Defaults (safe)
+  Vendo.DB.enabled = Vendo.DB.enabled ~= false
   Vendo.DB.autoRepair = Vendo.DB.autoRepair ~= false
   Vendo.DB.autoSellGray = Vendo.DB.autoSellGray ~= false
   Vendo.DB.chat = Vendo.DB.chat ~= false
-  Vendo.DB.soundRepair = Vendo.DB.soundRepair or false
-  Vendo.DB.soundSell = Vendo.DB.soundSell or false
-  Vendo.DB.autoSellJunkThreshold = Vendo.DB.autoSellJunkThreshold or 0  -- Copper threshold für extra Junk-Sell
-  Vendo.DB.minimapButton = Vendo.DB.minimapButton or true
-  Vendo.DB.log = Vendo.DB.log or {}  -- Log Array für letzte Interaktionen (max 10)
 
-  -- Stats Init (aus Vendo_Stats.lua)
-  Vendo:InitStats()
-
-  -- Minimap Button (modular)
-  if Vendo.DB.minimapButton then
-    Vendo:CreateMinimapButton()
-  end
+  -- Load Stats
+  if Vendo.InitStats then Vendo:InitStats() end
 
   self:UnregisterEvent("ADDON_LOADED")
 end)
 
--- Sell gray/junk items (erweitert)
-local function SellItems()
+-- Sell Grays
+local function SellGrays()
   local total = 0
-  local threshold = Vendo.DB.autoSellJunkThreshold
-
   for bag = 0, 4 do
-    local slots = C_Container.GetContainerNumSlots(bag)
-    for slot = 1, slots do
-      local item = C_Container.GetContainerItemInfo(bag, slot)
-      if item and item.hyperlink then
-        local quality = item.quality
-        local price = (select(11, GetItemInfo(item.hyperlink)) or 0) * item.stackCount
-        if (quality == 0 or (quality < 2 and price <= threshold)) and price > 0 then
+    for slot = 1, C_Container.GetContainerNumSlots(bag) do
+      local info = C_Container.GetContainerItemInfo(bag, slot)
+      if info and info.quality == 0 and info.stackCount > 0 then
+        local _, _, _, _, _, _, _, _, _, _, sellPrice = GetItemInfo(info.hyperlink)
+        if sellPrice then
           C_Container.UseContainerItem(bag, slot)
-          total = total + price
+          total = total + (sellPrice * info.stackCount)
         end
       end
     end
   end
-
   return total
 end
 
--- Auto repair (unverändert, aber mit Sound)
-local function RepairItems()
-  if not CanMerchantRepair() then return 0, false end
-
+-- Repair
+local function DoRepair()
+  if not CanMerchantRepair() then return 0 end
   local cost = GetRepairAllCost()
-  if not cost or cost <= 0 then return 0, false end
-
-  local useGuild = CanGuildBankRepair and CanGuildBankRepair()
-  RepairAllItems(useGuild)
-
-  return cost, useGuild
+  if cost > 0 then
+    local useGuild = CanGuildBankRepair and CanGuildBankRepair()
+    RepairAllItems(useGuild)
+    return cost, useGuild
+  end
+  return 0
 end
 
--- Merchant interaction (erweitert mit Log und Sounds)
+-- Merchant Event
 frame:RegisterEvent("MERCHANT_SHOW")
 frame:SetScript("OnEvent", function(self, event)
   if event ~= "MERCHANT_SHOW" or not Vendo.DB.enabled then return end
 
-  local sold = 0
-  local repaired = 0
-  local guild = false
-  local logEntry = { time = time(), sold = 0, repaired = 0 }
-
-  if Vendo.DB.autoSellGray then
-    sold = SellItems()
-    logEntry.sold = sold
-    Vendo:AddSold(sold)
-    if sold > 0 then
-      Print("Sold items for +" .. FormatMoney(sold))
-      if Vendo.DB.soundSell then PlaySound(120) end  -- AuctionWindowClose Sound
-    end
+  local sold = Vendo.DB.autoSellGray and SellGrays() or 0
+  if sold > 0 then
+    if Vendo.AddSold then Vendo:AddSold(sold) end
+    Print("Sold grays: +" .. FormatMoney(sold))
   end
 
-  if Vendo.DB.autoRepair then
-    repaired, guild = RepairItems()
-    logEntry.repaired = repaired
-    Vendo:AddRepair(repaired)
-    if repaired > 0 then
-      Print("Repaired gear for -" .. FormatMoney(repaired) .. (guild and " (guild)" or ""))
-      if Vendo.DB.soundRepair then PlaySound(119) end  -- AuctionWindowOpen Sound
-    end
+  local repaired, guild = Vendo.DB.autoRepair and DoRepair() or 0
+  if repaired > 0 then
+    if Vendo.AddRepair then Vendo:AddRepair(repaired) end
+    Print("Repaired: -" .. FormatMoney(repaired) .. (guild and " (guild)" or ""))
   end
-
-  -- Log hinzufügen (max 10)
-  table.insert(Vendo.DB.log, 1, logEntry)
-  if #Vendo.DB.log > 10 then table.remove(Vendo.DB.log) end
 end)
 
--- Slash commands (erweitert)
+-- Slash
 SLASH_VENDO1 = "/kt"
 SlashCmdList["VENDO"] = function(msg)
-  msg = (msg or ""):lower():trim()
-  local args = {strsplit(" ", msg)}
-
-  if msg == "on" then
-    Vendo.DB.enabled = true
-    Print("enabled")
-  elseif msg == "off" then
-    Vendo.DB.enabled = false
-    Print("disabled")
-  elseif args[1] == "repair" then
-    Vendo.DB.autoRepair = not Vendo.DB.autoRepair
-    Print("Auto repair: " .. (Vendo.DB.autoRepair and "ON" or "OFF"))
-  elseif args[1] == "sell" then
-    Vendo.DB.autoSellGray = not Vendo.DB.autoSellGray
-    Print("Auto sell: " .. (Vendo.DB.autoSellGray and "ON" or "OFF"))
-  elseif args[1] == "chat" then
-    Vendo.DB.chat = not Vendo.DB.chat
-    Print("Chat messages: " .. (Vendo.DB.chat and "ON" or "OFF"))
-  elseif args[1] == "stats" then
-    Vendo:PrintStats()
-  elseif args[1] == "reset" and args[2] then
-    Vendo:ResetStats(args[2])
-  elseif args[1] == "log" then
-    Vendo:PrintLog()
-  else
-    Print("Commands: /kt on | off | repair | sell | chat | stats | reset [session|today|weekly|lifetime] | log")
-  end
-end
-
--- Minimap Button (neu)
-function Vendo:CreateMinimapButton()
-  local button = CreateFrame("Button", "VendoMinimapButton", Minimap)
-  button:SetSize(32, 32)
-  button:SetFrameStrata("MEDIUM")
-  button:SetPoint("TOPLEFT", Minimap, "TOPLEFT", 0, 0)  -- Anpassen
-  button:SetNormalTexture("Interface\\AddOns\\Vendo\\icon")  -- Füge eine Icon-Texture hinzu, falls du eine hast
-  button:SetScript("OnClick", function(self, btn)
-    if btn == "LeftButton" then
-      InterfaceOptionsFrame_OpenToCategory("Vendo")
-    elseif btn == "RightButton" then
-      Vendo:PrintStats()
-    end
-  end)
-  button:SetScript("OnEnter", function(self)
-    GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:AddLine("Vendo")
-    GameTooltip:AddLine("Left: Options | Right: Stats")
-    GameTooltip:Show()
-  end)
-  button:SetScript("OnLeave", GameTooltip_Hide)
+  msg = (msg or ""):lower()
+  if msg == "on" then Vendo.DB.enabled = true; Print("Enabled") end
+  if msg == "off" then Vendo.DB.enabled = false; Print("Disabled") end
+  if msg == "repair" then Vendo.DB.autoRepair = not Vendo.DB.autoRepair; Print("Repair: " .. (Vendo.DB.autoRepair and "ON" or "OFF")) end
+  if msg == "sell" then Vendo.DB.autoSellGray = not Vendo.DB.autoSellGray; Print("Sell: " .. (Vendo.DB.autoSellGray and "ON" or "OFF")) end
+  if msg == "chat" then Vendo.DB.chat = not Vendo.DB.chat; Print("Chat: " .. (Vendo.DB.chat and "ON" or "OFF")) end
+  if msg == "stats" and Vendo.PrintStats then Vendo:PrintStats() end
+  Print(" /kt on|off|repair|sell|chat|stats")
 end
