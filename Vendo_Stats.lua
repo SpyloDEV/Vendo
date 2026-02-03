@@ -64,7 +64,7 @@ local function AddTooltipStats(tooltip)
     tooltip:AddLine("Net: " .. GetCoinTextureString(t.sold - t.repaired), 0.4, 1, 0.4)
 end
 
-GameTooltip:HookScript("OnTooltipSetUnit", function(tooltip)
+if not MerchantFrame or not MerchantFrame:IsShown() then return end
     if ShouldShowTooltipStats() then
         AddTooltipStats(tooltip)
         tooltip:Show()
