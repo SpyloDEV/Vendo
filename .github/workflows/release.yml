@@ -3,21 +3,24 @@ name: Build & Release ZIP
 on:
   push:
     tags:
-      - 'v*.*.*'           # z. B. v0.2.1, v1.0.0
-      - 'v*.*.*-*'         # z. B. v0.2.1-beta1, v0.3.0-alpha2
+      - 'v*.*.*'        # z. B. v0.2.1, v1.0.0
+      - 'v*.*.*-*'      # z. B. v0.2.1-beta1, v0.3.0-alpha2
 
 permissions:
-  contents: write        # Für Releases und Tags
+  contents: write      # notwendig für Releases & Assets
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
+      # 1️⃣ Repository auschecken
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0   # Vollständige History → für gute Release Notes
+          fetch-depth: 0   # volle Historie (gut für spätere Changelogs)
 
+      # 2️⃣ Version & ZIP-Name aus Tag bestimmen
       - name: Determine version and filename
         id: vars
         run: |
@@ -26,22 +29,24 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "zip_name=$ZIP_NAME" >> $GITHUB_OUTPUT
 
+      # 3️⃣ Addon-Ordner vorbereiten
       - name: Prepare addon folder
         run: |
           mkdir -p dist/Vendo
-          
-          # Kopiere nur die relevanten Dateien (gitignore-respektierend)
-          rsync -av --exclude-from=.gitignore \
+          rsync -av \
+            --exclude-from=.gitignore \
             --exclude='.git' \
             --exclude='.github' \
             --exclude='dist' \
             ./ dist/Vendo/
 
+      # 4️⃣ ZIP erstellen (korrekte Struktur!)
       - name: Create ZIP archive
         working-directory: dist
         run: |
           zip -r "${{ steps.vars.outputs.zip_name }}" Vendo
 
+      # 5️⃣ GitHub Release erstellen (MIT MANUELLEM BODY)
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -50,16 +55,19 @@ jobs:
           body: |
             **Vendo ${{ steps.vars.outputs.version }}** ist jetzt verfügbar!
 
-            ### Wichtige Änderungen
-            - Automatisch generierte Release-Notes aus Commits (siehe unten)
+            ### 🛠 Bugfixes & Improvements
+            - Fixed addon detection issues after updates
+            - Improved CurseForge client compatibility
+            - Enhanced update stability
 
-            ### Installation
+            ### 📦 Installation
             1. Lade das ZIP herunter
-            2. Entpacke in deinen WoW AddOns-Ordner (`Interface\AddOns\`)
-            3. Starte/relade WoW und aktiviere Vendo
+            2. Entpacke es in deinen WoW AddOns-Ordner (`Interface\AddOns`)
+            3. Starte oder reloade WoW und aktiviere Vendo
 
+            Thanks to everyone who reported issues and helped improve the addon!
             Viel Spaß beim Gold sparen! 💰
           draft: false
-          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') || contains(github.ref_name, 'rc') }}
-          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+          generate_release_notes: false
           files: dist/${{ steps.vars.outputs.zip_name }}
