@@ -1,82 +1,53 @@
 # Vendo
 
-A lightweight and modern World of Warcraft addon designed to make vendor interactions completely effortless.
+Vendo is a lightweight World of Warcraft addon for vendor automation.
 
-Clean. Fast. Invisible.
+When you open a merchant window, the addon can automatically repair your gear, sell gray items and print a short gold summary to chat. It also keeps simple sold and repair statistics per character.
 
----
+## Features
 
-✨ FEATURES
+- automatic gear repair at vendors
+- guild bank repair support when available
+- automatic selling of gray items
+- stack-aware gold calculation
+- optional chat output
+- per-character saved settings
+- simple session and daily money stats
+- in-game options panel
 
-🔧 Automatic Repairs  
-Repairs your gear automatically when interacting with a vendor.  
-Supports guild bank repairs if available and permitted.
+## Slash commands
 
-🪙 Automatic Gray Item Selling  
-Automatically sells all poor-quality (gray) items.  
-Uses stack-aware price calculation for accurate gold tracking.
+Vendo works without manual setup. The slash command is only there if you want to toggle features quickly.
 
-💬 Clean Chat Summary  
-Minimal and color-coded chat messages.  
-Clearly shows how much gold you spent or earned.
+```text
+/kt on
+/kt off
+/kt repair
+/kt sell
+/kt chat
+/kt stats
+```
 
----
+## Installation
 
-⚙️ COMMANDS
+1. Download or clone the repository.
+2. Place the `Vendo` folder inside your WoW `AddOns` directory.
+3. Restart the game or reload the UI.
+4. Enable the addon in the AddOns menu if needed.
 
-Vendo works out of the box.  
-Commands are optional and only needed for customization.
+## Files
 
-/kt on – Enable Vendo  
-/kt off – Disable Vendo  
-/kt repair – Toggle automatic repairs  
-/kt sell – Toggle gray item selling  
-/kt chat – Toggle chat messages
+- `Vendo.lua` main merchant logic and slash commands
+- `Vendo_Stats.lua` session and daily money tracking
+- `Vendo_Options.lua` interface options panel
+- `Vendo.toc` addon metadata
 
----
+## Notes
 
-🎯 DESIGN PHILOSOPHY
+- settings are stored per character through `VendoDBPC`
+- the current command prefix is `/kt`
+- the addon is intentionally small and focused on vendor interactions only
 
-Vendo is built with a strict minimalist mindset.
+## License
 
-• No intrusive UI  
-• No unnecessary background processing  
-• No feature bloat  
-
-Install it once. Forget about it. Enjoy smoother gameplay.
-
----
-
-📦 INSTALLATION
-
-Download the latest release.  
-Extract the Vendo folder into your World of Warcraft AddOns directory.  
-Restart the game and enable Vendo in the AddOns menu.
-
----
-
-🔮 PLANNED FEATURES
-
-• Per-character settings  
-• Optional sound notifications  
-• Detailed gold statistics  
-• Modular feature system
-
----
-
-❤️ SUPPORT & FEEDBACK
-
-If you enjoy using Vendo, consider supporting the project.
-
-• Rate the addon on CurseForge  
-• Report bugs or issues on GitHub  
-• Feature suggestions are always welcome  
-
-Your support helps keep the project alive and improving.
-
----
-
-📜 LICENSE
-
-MIT License  
-Free to use, modify, and distribute.
+MIT
